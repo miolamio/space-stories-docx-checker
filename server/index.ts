@@ -1,20 +1,10 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import path from "path";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
-// CORS configuration for development
-if (process.env.NODE_ENV !== 'production') {
-  app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    next();
-  });
-}
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -57,22 +47,18 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  if (process.env.NODE_ENV === "development") {
+  // importantly only setup vite in development and after
+  // setting up all the other routes so the catch-all route
+  // doesn't interfere with the other routes
+  if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
-    // Serve static files in production
-    const clientDistPath = path.join(process.cwd(), 'client', 'dist');
-    app.use(express.static(clientDistPath));
-    
-    // Fallback for SPA routing
-    app.get('*', (req, res) => {
-      if (!req.path.startsWith('/api')) {
-        res.sendFile(path.join(clientDistPath, 'index.html'));
-      }
-    });
+    serveStatic(app);
   }
 
-  const PORT = process.env.PORT || 3000;
+  // ALWAYS serve the app on port 3000
+  // this serves both the API and the client
+  const PORT = 3000;
   server.listen(PORT, "0.0.0.0", () => {
     log(`serving on port ${PORT}`);
   });
